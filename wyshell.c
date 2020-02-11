@@ -1,18 +1,10 @@
 /*************************************
- * simple.c
- * Author: Kim Buckner
- * Date: 8 April 2020
+ * wyshell.c
+ * Author: Lucas Manker
+ * Date: 10 April 2020
  *
- * Really simple scanner demo for 3750 wyshell project.
- *
- * MAKEFILE NOTE::::  You WILL get warnings about unused functions in the
- * wyscanner.c file when you use -Wall, unless you turn them off with 
- * -Wno-unused-function
- *
- * The values returned by parse_line() are in the wyscanner.h file. I have just
- * made some strings in an array, because I am lazy, to correspond with those. 
- * The "tokens[rtn&96]" is the way I access. You will see that QUOTE_ERROR has
- * a value of 96 in the header file, and so on. 
+ * scanner for 3750 wyshell project.
+ * Parts of this code graciously provided by Dr. Buckner
  ************************************/
 
 #include<stdio.h>
@@ -28,8 +20,12 @@ int main()
   int rtn;
   char *rpt;
   char buf[1024];
+  char *start = ":--:";
+  char *inner = " --:";
+  int command = 0;
 
   while(1) {
+    printf("$>");
     rpt=fgets(buf,256,stdin);
     if(rpt == NULL) {
       if(feof(stdin)) {
@@ -45,7 +41,21 @@ int main()
       // that makes it break out when an error or EOL is seen
       switch(rtn) {
         case WORD:
-          printf("%s\n",lexeme);
+          if(!command){
+            printf("%s %s\n",start,lexeme);
+            command = 1;
+          }
+          else{
+              printf("%s %s\n",inner,lexeme);
+          }
+          break;
+        case SEMICOLON:
+          printf(" ;\n");
+          command = 0;
+          break;
+        case PIPE:
+          printf(" |\n");
+          command = 0;
           break;
         case ERROR_CHAR:
           printf("%d: %s\t =%d\n",rtn,tokens[rtn%96],error_char);
@@ -54,6 +64,10 @@ int main()
           printf("%d: %s\n",rtn,tokens[rtn%96]);
       }
       rtn=parse_line(NULL);
+    }
+    if(rtn == EOL){
+        printf("%s EOL", inner);
+        command = 0;
     }
     printf("\n");
   }
