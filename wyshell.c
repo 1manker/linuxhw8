@@ -23,9 +23,17 @@ int main()
   char *start = ":--:";
   char *inner = " --:";
   int command = 0;
+  int redirCount = 0;
+  int redirIcount = 0;
+  int errorOnLine = 0;
+  int expFile = 0;
 
   while(1) {
-    printf("$>");
+    printf("$> ");
+    errorOnLine = 0;
+    redirCount = 0;
+    redirIcount = 0;
+    command = 0;
     rpt=fgets(buf,256,stdin);
     if(rpt == NULL) {
       if(feof(stdin)) {
@@ -37,10 +45,12 @@ int main()
       }
     }
     rtn=parse_line(buf);
-    while(rtn !=  EOL){ 
-      // that makes it break out when an error or EOL is seen
+    while(rtn !=  EOL && !errorOnLine){
       switch(rtn) {
         case WORD:
+          if(expFile){
+              expFile = 0;
+          }
           if(!command){
             printf("%s %s\n",start,lexeme);
             command = 1;
@@ -50,23 +60,141 @@ int main()
           }
           break;
         case SEMICOLON:
+          if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
           printf(" ;\n");
           command = 0;
+          redirCount = 0;
+          redirIcount = 0;
           break;
         case PIPE:
+          if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          if(!command){
+              printf("syntax error near '|'");
+              errorOnLine = 1;
+              break;
+          }
           printf(" |\n");
           command = 0;
+          redirCount = 0;
+          redirIcount = 0;
+          break;
+        case AMP:
+          if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          printf(" &\n");
+          break;
+        case REDIR_OUT:
+          if(!command){
+              printf("error near '>'");
+              errorOnLine = 1;
+              break;
+          }
+          if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          if(redirCount >= 1){
+              printf("Ambiguous output redirection");
+              errorOnLine = 1;
+              break;
+          }
+          else{
+              printf(" >\n");
+              redirCount = 1;
+              expFile = 1;
+              break;
+          }
+        case REDIR_IN:
+          if(!command){
+              printf("error near '<'");
+              errorOnLine = 1;
+              break;
+          }
+          if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          if(redirIcount >= 1){
+              printf("Ambigous input redirection");
+              errorOnLine = 1;
+              break;
+          }
+          else{
+              printf(" <\n");
+              redirIcount = 1;
+              expFile = 1;
+              break;
+          }
+        case APPEND_OUT:
+           if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          printf(" >>\n");
           break;
         case ERROR_CHAR:
-          printf("%d: %s\t =%d\n",rtn,tokens[rtn%96],error_char);
+          printf("error char: %d",error_char);
+          errorOnLine = 1;
           break;
+        case QUOTE_ERROR:
+          printf("quote error");
+          errorOnLine = 1;
+          break;
+        case APPEND_ERR:
+          if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          printf(" 2>>\n");
+          break;
+        case REDIR_ERR_OUT:
+          if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          printf(" 2>&1\n");
+          break;
+        case REDIR_ERR:
+           if(expFile){
+              printf("missing filename after redirection");
+              errorOnLine = 1;
+              break;
+          }
+          printf(" 2>\n");
+          break;
+        case SYSTEM_ERROR:
+          perror("system error");
+          return(1);
+        
         default:
           printf("%d: %s\n",rtn,tokens[rtn%96]);
       }
       rtn=parse_line(NULL);
     }
-    if(rtn == EOL){
-        printf("%s EOL", inner);
+    if(rtn == EOL && !errorOnLine){
+        if(expFile){
+            printf("missing filename after redirection");
+            errorOnLine = 1;
+        }
+        else{
+            printf("%s EOL", inner);
+        }
         command = 0;
     }
     printf("\n");
